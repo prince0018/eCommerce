@@ -1,5 +1,8 @@
+# ...existing code...
 import os
 import psycopg2
+from psycopg2 import sql
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,8 +15,41 @@ HOST = os.getenv("DB_HOST")
 PORT = os.getenv("DB_PORT")
 
 
+def ensure_database_exists(dbname, user, password, host, port):
+    try:
+        conn = psycopg2.connect(
+            dbname="postgres",
+            user=user,
+            password=password,
+            host=host,
+            port=port
+        )
+
+        # 🔥 KEY FIX: set autocommit BEFORE doing anything
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+
+        cur = conn.cursor()
+
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s;", (dbname,))
+        exists = cur.fetchone()
+
+        if not exists:
+            cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(dbname)))
+            print(f"✅ Created database {dbname}")
+        else:
+            print(f"ℹ️ Database {dbname} already exists")
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        print("❌ Could not ensure database exists:", e)
+        raise
 def seed_products():
     try:
+        # ensure DB exists before connecting
+        ensure_database_exists(DB_NAME, USER, PASSWORD, HOST, PORT)
+
         conn = psycopg2.connect(
             dbname=DB_NAME,
             user=USER,
@@ -22,6 +58,9 @@ def seed_products():
             port=PORT
         )
         cur = conn.cursor()
+        
+        # The connection (conn) is like opening a line to the database,
+        # and the cursor (cur) is what actually sends commands through that line.
 
         # ✅ Step 1: Create table
         cur.execute("""
@@ -115,3 +154,4 @@ def seed_products():
 
 if __name__ == "__main__":
     seed_products()
+# ...existing code...

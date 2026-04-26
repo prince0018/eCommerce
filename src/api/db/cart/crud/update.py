@@ -1,51 +1,55 @@
-def get_cart(user_id: int):
-    conn = None
-    cur = None
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from api.db.connection import get_connection
+
+router = APIRouter()
+
+
+class UpdateCartRequest(BaseModel):
+    user_id: int
+    product_id: int
+    quantity: int
+
+
+@router.put("/cart/update")
+def update_cart(data: UpdateCartRequest):
+    """Update quantity for a product in user's cart. If quantity <= 0 the item is removed."""
     try:
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute("""
-            SELECT 
-                p.id,
-                p.name,
-                p.price,
-                c.quantity,
-                (p.price * c.quantity) AS total_price
-            FROM cart c
-            JOIN products p ON c.product_id = p.id
-            WHERE c.user_id = %s;
-        """, (user_id,))
+        # Check product exists in cart
+        cur.execute(
+            "SELECT quantity FROM cart WHERE user_id = %s AND product_id = %s;",
+            (data.user_id, data.product_id)
+        )
+        existing = cur.fetchone()
 
-        rows = cur.fetchall()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Cart item not found")
 
-        if not rows:
-            return {"message": "Cart is empty", "cart": []}
+        if data.quantity <= 0:
+            # Remove item
+            cur.execute(
+                "DELETE FROM cart WHERE user_id = %s AND product_id = %s;",
+                (data.user_id, data.product_id)
+            )
+            message = "Item removed from cart"
+        else:
+            # Update quantity
+            cur.execute(
+                "UPDATE cart SET quantity = %s WHERE user_id = %s AND product_id = %s;",
+                (data.quantity, data.user_id, data.product_id)
+            )
+            message = "Cart updated"
 
-        cart_items = []
-        grand_total = 0
+        conn.commit()
+        cur.close()
+        conn.close()
 
-        for row in rows:
-            item = {
-                "product_id": row[0],
-                "name": row[1],
-                "price": float(row[2]),
-                "quantity": row[3],
-                "total_price": float(row[4])
-            }
-            grand_total += float(row[4])
-            cart_items.append(item)
+        return {"message": message}
 
-        return {
-            "cart": cart_items,
-            "grand_total": grand_total
-        }
-
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()

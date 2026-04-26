@@ -1,3 +1,10 @@
+from fastapi import APIRouter, HTTPException
+from api.db.connection import get_connection
+
+router = APIRouter()
+
+
+@router.get("/cart/{user_id}")
 def get_cart(user_id: int):
     conn = None
     cur = None
