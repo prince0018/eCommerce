@@ -50,7 +50,6 @@ def create_app() -> FastAPI:
         return {"message": "Seed completed"}
 
     return app
-.
 
 app = create_app()
 
