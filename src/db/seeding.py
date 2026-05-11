@@ -1,18 +1,15 @@
-# ...existing code...
-import os
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from dotenv import load_dotenv
 
-load_dotenv()
+from src.core.config import settings
 
 # Load env variables
-DB_NAME = os.getenv("DB_NAME")
-USER = os.getenv("DB_USER")
-PASSWORD = os.getenv("DB_PASSWORD")
-HOST = os.getenv("DB_HOST")
-PORT = os.getenv("DB_PORT")
+DB_NAME = settings.db_name
+USER = settings.db_user
+PASSWORD = settings.db_password
+HOST = settings.db_host
+PORT = settings.db_port
 
 
 def ensure_database_exists(dbname, user, password, host, port):
@@ -154,4 +151,3 @@ def seed_products():
 
 if __name__ == "__main__":
     seed_products()
-# ...existing code...

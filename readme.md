@@ -30,8 +30,7 @@ This is a starter eCommerce platform built with:
 - Clear entire cart.
 
 ### Checkout
-- Place orders from cart items.
-- Order data saved to database.
+- Calculate checkout totals from cart items.
 
 ## Project Structure
 
@@ -44,24 +43,30 @@ eCommerce/
 ├── constants/
 │   └── constants.py           # App-wide constants
 ├── src/
-│   └── api/
-│       ├── auth/              # Authentication (routes, JWT, password hashing)
-│       │   ├── routes.py
-│       │   └── auth.py
-│       ├── db/
-│       │   ├── connection.py  # PostgreSQL connection helper
-│       │   ├── seeding.py     # Seed initial product data
-│       │   ├── users.py       # User DB helpers
-│       │   └── cart/
-│       │       └── crud/
-│       │           ├── create.py    # Add to cart
-│       │           ├── read.py      # Get cart
-│       │           ├── update.py    # Update cart quantity
-│       │           └── delete.py    # Remove from cart / clear cart
-│       ├── inventory/
-│       │   └── inventoryStock.py    # List all products
-│       └── order/
-│           └── checkoutCart.py      # Checkout / place order
+│   ├── api/
+│   │   └── routes/            # FastAPI route handlers
+│   │       ├── auth.py
+│   │       ├── cart.py
+│   │       ├── checkout.py
+│   │       └── products.py
+│   ├── core/                  # Shared config and security helpers
+│   │   ├── config.py
+│   │   └── security.py
+│   ├── db/                    # Database connection and seeding
+│   │   ├── connection.py
+│   │   └── seeding.py
+│   ├── repositories/          # SQL/database access functions
+│   │   ├── cart_repository.py
+│   │   ├── product_repository.py
+│   │   └── user_repository.py
+│   ├── schemas/               # Pydantic request models
+│   │   ├── auth.py
+│   │   └── cart.py
+│   └── services/              # Business logic
+│       ├── auth_service.py
+│       ├── cart_service.py
+│       ├── checkout_service.py
+│       └── product_service.py
 └── tests/                     # Unit tests (coming soon)
 ```
 
@@ -103,14 +108,14 @@ SECRET_KEY=your-secret-key-here
 ### Step 5: Seed Data
 Run the seeding script to create tables and populate initial products:
 ```bash
-python src/api/db/seeding.py
+python -m src.db.seeding
 ```
 
 ## Running the Application
 
 ### Option 1: Module Mode (Recommended)
 ```bash
-uvicorn src.api.main:app --reload
+uvicorn main:app --reload
 ```
 
 ### Option 2: Direct Run
@@ -130,8 +135,12 @@ Interactive API docs: `http://localhost:8000/docs`
   - Returns: user id, email, full_name
 
 - `POST /auth/token` — Login and get access token
-  - Body (form-data): `username=user@example.com&password=secret`
+  - Body: `{ "email": "user@example.com", "password": "secret" }`
   - Returns: `{ "access_token": "...", "token_type": "bearer" }`
+
+- `GET /auth/me` — Get the authenticated user profile
+  - Header: `Authorization: Bearer {access_token}`
+  - Returns: user id, email, full_name, created_at
 
 ### Inventory
 - `GET /inventory/products` — List all products
@@ -157,11 +166,10 @@ Interactive API docs: `http://localhost:8000/docs`
   - Body: `{ "user_id": 1 }`
   - Returns: success message
 
-### Orders
-- `POST /order/checkout` — Place order from cart
+### Checkout
+- `GET /cart/checkout/{user_id}` — Calculate checkout totals from cart
   - Header: `Authorization: Bearer {access_token}`
-  - Body: `{ "user_id": 1 }`
-  - Returns: order confirmation with order id
+  - Returns: cart items, subtotal, tax, delivery fee, and total amount
 
 ## Database Schema
 
@@ -215,8 +223,8 @@ created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 2. **Login and get token**
    ```bash
    curl -X POST http://localhost:8000/auth/token \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "username=john@example.com&password=secure123"
+     -H "Content-Type: application/json" \
+     -d '{"email":"john@example.com", "password":"secure123"}'
    ```
 
 3. **Browse products**
@@ -240,10 +248,8 @@ created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 
 6. **Checkout**
    ```bash
-   curl -X POST http://localhost:8000/order/checkout \
-     -H "Authorization: Bearer <ACCESS_TOKEN>" \
-     -H "Content-Type: application/json" \
-     -d '{"user_id":1}'
+   curl -H "Authorization: Bearer <ACCESS_TOKEN>" \
+     http://localhost:8000/cart/checkout/1
    ```
 
 ## Future Enhancements
@@ -272,7 +278,7 @@ created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 ## Troubleshooting
 
 ### Import errors (ModuleNotFoundError)
-- Run with: `uvicorn src.api.main:app --reload`
+- Run with: `uvicorn main:app --reload`
 - Or ensure `src/` folder has `__init__.py` files.
 
 ### Database connection fails
@@ -281,7 +287,7 @@ created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 - Verify database exists: `psql -l` or run seeding script.
 
 ### No products in inventory
-- Run: `python src/api/db/seeding.py` to populate initial data.
+- Run: `python -m src.db.seeding` to populate initial data.
 
 ## License & Contribution
 

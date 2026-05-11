@@ -1,5 +1,4 @@
 python-dotenv
 uvicorn 
 fastapi
-passlib[bcrypt] 
-PyJWT 
+psycopg2-binary
