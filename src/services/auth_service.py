@@ -270,4 +270,3 @@ def get_authenticated_user(user_id: int):
     ## Step 4: Return user data in safe format (no passwords, hashes, etc.)
     return {"user": _public_user(user)}
 
-..
