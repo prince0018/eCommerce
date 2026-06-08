@@ -17,6 +17,7 @@ router = APIRouter(prefix="/cart", tags=["cart"])
 
 @router.get("", response_model=CartResponse)
 def get_cart(current_user=Depends(get_current_user)) -> CartResponse:
+    # Return the current user's cart.
     with get_connection() as connection:
         return get_user_cart(connection, current_user["id"])
 
@@ -30,6 +31,7 @@ def add_cart_item(
     item_request: CartItemCreate,
     current_user=Depends(get_current_user),
 ) -> CartResponse:
+    # Add one item to the cart.
     with get_connection() as connection:
         product = get_product_for_cart(connection, item_request.product_id)
         if product is None:
@@ -75,6 +77,7 @@ def update_cart_item(
     item_update: CartItemUpdate,
     current_user=Depends(get_current_user),
 ) -> CartResponse:
+    # Update one cart item's quantity.
     with get_connection() as connection:
         product = get_product_for_cart(connection, product_id)
         if product is None:
@@ -111,6 +114,7 @@ def remove_cart_item(
     product_id: int,
     current_user=Depends(get_current_user),
 ) -> Response:
+    # Remove one cart item.
     with get_connection() as connection:
         cursor = connection.execute(
             "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?;",
@@ -127,6 +131,7 @@ def remove_cart_item(
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 def clear_cart(current_user=Depends(get_current_user)) -> Response:
+    # Clear the whole cart.
     with get_connection() as connection:
         connection.execute(
             "DELETE FROM cart_items WHERE user_id = ?;",
@@ -138,7 +143,9 @@ def clear_cart(current_user=Depends(get_current_user)) -> Response:
 
 @router.post("/checkout", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def checkout_cart(current_user=Depends(get_current_user)) -> OrderResponse:
+    # Convert the cart into an order.
     with get_connection() as connection:
+        # Read the current cart first so we can turn it into an order.
         cart = get_user_cart(connection, current_user["id"])
 
     if not cart.items:
@@ -149,6 +156,7 @@ def checkout_cart(current_user=Depends(get_current_user)) -> OrderResponse:
 
     order = create_order(
         OrderCreate(
+            # Use a stable customer id string that matches the order schema.
             customer_id=f"user-{current_user['id']}",
             items=[
                 OrderItemCreate(
@@ -161,6 +169,7 @@ def checkout_cart(current_user=Depends(get_current_user)) -> OrderResponse:
     )
 
     with get_connection() as connection:
+        # Empty the cart after checkout succeeds.
         connection.execute(
             "DELETE FROM cart_items WHERE user_id = ?;",
             (current_user["id"],),

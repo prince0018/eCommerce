@@ -16,6 +16,7 @@ from app.services.orders.routes import router as orders_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create the database schema and preload products before the app starts serving traffic.
     initialize_database()
     import_dummyjson_products()
     yield
@@ -28,17 +29,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Serve the built-in frontend directly from the backend package.
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
 @app.get("/", include_in_schema=False)
 def storefront() -> FileResponse:
+    # Serve the homepage.
     return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/health", tags=["health"])
 def health_check() -> dict[str, str]:
+    # Return a simple health status.
     return {"status": "ok", "service": "ecommerce"}
 
 

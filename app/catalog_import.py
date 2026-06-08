@@ -2,23 +2,24 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
-from pathlib import Path
 from urllib.request import Request, urlopen
 
-from app.database import BASE_DIR, get_connection, initialize_database
+from app.database import get_connection, initialize_database
+from app.paths import CACHE_PATH
 
 
 DUMMYJSON_URL = "https://dummyjson.com/products?limit=0"
-CACHE_PATH = BASE_DIR / "data" / "dummyjson_products.json"
 USD_TO_INR_RATE = Decimal(os.getenv("USD_TO_INR_RATE", "95.5"))
 SYNC_INTERVAL_HOURS = int(os.getenv("DUMMYJSON_SYNC_INTERVAL_HOURS", "24"))
 
 
 def load_cached_catalog() -> dict:
+    # Local fallback snapshot used when DummyJSON is unavailable.
     return json.loads(CACHE_PATH.read_text(encoding="utf-8"))
 
 
 def fetch_dummyjson_catalog() -> dict:
+    # Allow offline runs by forcing the checked-in cache file.
     if os.getenv("DUMMYJSON_USE_CACHE_ONLY", "").lower() in {"1", "true", "yes"}:
         return load_cached_catalog()
 
@@ -34,6 +35,7 @@ def fetch_dummyjson_catalog() -> dict:
 
 
 def should_sync_catalog() -> bool:
+    # Skip unnecessary imports if the last sync is still fresh.
     with get_connection() as connection:
         row = connection.execute(
             "SELECT value FROM app_metadata WHERE key = 'dummyjson_last_sync';"
@@ -49,6 +51,7 @@ def should_sync_catalog() -> bool:
 
 
 def convert_usd_to_inr(usd_price: int | float | str) -> Decimal:
+    # Store prices in INR so the rest of the app uses one currency.
     return (Decimal(str(usd_price)) * USD_TO_INR_RATE).quantize(
         Decimal("1"),
         rounding=ROUND_HALF_UP,
@@ -56,6 +59,7 @@ def convert_usd_to_inr(usd_price: int | float | str) -> Decimal:
 
 
 def import_dummyjson_products(force: bool = False) -> int:
+    # Ensure the schema exists before importing product data.
     initialize_database()
     if not force and not should_sync_catalog():
         return 0
@@ -64,12 +68,14 @@ def import_dummyjson_products(force: bool = False) -> int:
     products = catalog.get("products", [])
 
     with get_connection() as connection:
+        # Remember whether this is the first sync so we only seed stock once.
         previous_sync = connection.execute(
             "SELECT value FROM app_metadata WHERE key = 'dummyjson_last_sync';"
         ).fetchone()
         first_sync = previous_sync is None
 
         for product in products:
+            # Keep both catalog details and inventory quantity in sync with the source data.
             price_inr = convert_usd_to_inr(product["price"])
             brand = product.get("brand") or "Unbranded"
             images = product.get("images") or []
@@ -134,6 +140,7 @@ def import_dummyjson_products(force: bool = False) -> int:
                     json.dumps(product),
                 ),
             )
+            # On the very first sync, initialize inventory with the source stock level.
             connection.execute(
                 """
                 INSERT INTO inventory_items (product_id, sku, available_quantity)

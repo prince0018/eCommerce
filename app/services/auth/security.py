@@ -20,6 +20,7 @@ bearer_scheme = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
+    # Hash passwords with PBKDF2 and a random salt before storing them.
     salt = secrets.token_bytes(16)
     password_hash = hashlib.pbkdf2_hmac(
         "sha256",
@@ -35,6 +36,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
+    # Compare hashes in constant time to avoid timing leaks.
     try:
         algorithm, iterations, salt_value, expected_value = stored_hash.split("$", 3)
         if algorithm != "pbkdf2_sha256":
@@ -55,6 +57,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 
 def create_access_token(user_id: int) -> str:
+    # Encode the signed-in user id with an expiry time.
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
@@ -67,6 +70,7 @@ def create_access_token(user_id: int) -> str:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ):
+    # Shared dependency for protected endpoints.
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired authentication token",
@@ -74,6 +78,7 @@ def get_current_user(
     )
 
     try:
+        # Decode the bearer token and recover the user id from its subject.
         payload = jwt.decode(
             credentials.credentials,
             JWT_SECRET,
@@ -84,6 +89,7 @@ def get_current_user(
         raise credentials_error from exc
 
     with get_connection() as connection:
+        # Fetch the active user record for the authenticated request.
         user = connection.execute(
             "SELECT * FROM users WHERE id = ? AND is_active = 1;",
             (user_id,),

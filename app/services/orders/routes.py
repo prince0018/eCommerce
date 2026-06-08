@@ -17,6 +17,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 
 
 def get_order_with_items(connection, order_id: int) -> OrderResponse | None:
+    # Load one order with its items.
     order = connection.execute(
         "SELECT * FROM orders WHERE id = ?;",
         (order_id,),
@@ -65,6 +66,7 @@ def get_order_with_items(connection, order_id: int) -> OrderResponse | None:
 
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(order_request: OrderCreate) -> OrderResponse:
+    # Create the order and its line items.
     with get_connection() as connection:
         product_ids = [item.product_id for item in order_request.items]
         if len(product_ids) != len(set(product_ids)):
@@ -178,6 +180,7 @@ def create_order(order_request: OrderCreate) -> OrderResponse:
 
 @router.get("", response_model=OrderListResponse)
 def list_orders() -> OrderListResponse:
+    # Return all orders in reverse order.
     with get_connection() as connection:
         order_rows = connection.execute(
             "SELECT id FROM orders ORDER BY created_at DESC, id DESC;"
@@ -192,6 +195,7 @@ def list_orders() -> OrderListResponse:
 
 @router.get("/{order_id}", response_model=OrderResponse)
 def get_order(order_id: int) -> OrderResponse:
+    # Return one order by id.
     with get_connection() as connection:
         order = get_order_with_items(connection, order_id)
 

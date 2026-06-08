@@ -20,6 +20,7 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 
 def serialize_inventory(row) -> InventoryItemResponse:
+    # Convert one inventory row into an API model.
     return InventoryItemResponse(
         product_id=row["product_id"],
         sku=row["sku"],
@@ -33,6 +34,7 @@ def serialize_inventory(row) -> InventoryItemResponse:
 
 @router.get("", response_model=InventoryListResponse)
 def list_inventory() -> InventoryListResponse:
+    # Return inventory for all active products.
     with get_connection() as connection:
         rows = connection.execute(
             """
@@ -57,6 +59,7 @@ def list_inventory() -> InventoryListResponse:
 
 @router.get("/{product_id}", response_model=InventoryItemResponse)
 def get_inventory(product_id: int) -> InventoryItemResponse:
+    # Return one inventory item.
     with get_connection() as connection:
         row = get_inventory_row(connection, product_id)
 
@@ -74,6 +77,7 @@ def update_available_quantity(
     product_id: int,
     quantity_update: InventoryQuantityUpdate,
 ) -> InventoryItemResponse:
+    # Set the available quantity for one item.
     with get_connection() as connection:
         if not set_available_quantity(
             connection,
@@ -95,6 +99,7 @@ def reserve_stock(
     product_id: int,
     reserve_request: InventoryReserveRequest,
 ) -> InventoryItemResponse:
+    # Reserve stock for checkout.
     with get_connection() as connection:
         row = get_inventory_row(connection, product_id)
         if row is None:
@@ -119,6 +124,7 @@ def purchase_stock(
     product_id: int,
     purchase_request: InventoryPurchaseRequest,
 ) -> InventoryItemResponse:
+    # Finalize stock after purchase.
     with get_connection() as connection:
         row = get_inventory_row(connection, product_id)
         if row is None:

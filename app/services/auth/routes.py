@@ -19,6 +19,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def serialize_user(user) -> UserResponse:
+    # Convert database rows into the response model used by the API.
     return UserResponse(
         id=user["id"],
         email=user["email"],
@@ -35,6 +36,7 @@ def serialize_user(user) -> UserResponse:
 )
 def register_user(user_request: UserRegister) -> UserResponse:
     with get_connection() as connection:
+        # Prevent duplicate accounts for the same email address.
         existing_user = connection.execute(
             "SELECT id FROM users WHERE email = ?;",
             (user_request.email,),
@@ -56,6 +58,7 @@ def register_user(user_request: UserRegister) -> UserResponse:
                 hash_password(user_request.password),
             ),
         )
+        # Return the freshly created user record.
         user = connection.execute(
             "SELECT * FROM users WHERE id = ?;",
             (cursor.lastrowid,),
@@ -67,6 +70,7 @@ def register_user(user_request: UserRegister) -> UserResponse:
 @router.post("/login", response_model=TokenResponse)
 def login_user(login_request: UserLogin) -> TokenResponse:
     with get_connection() as connection:
+        # Only active users can log in.
         user = connection.execute(
             "SELECT * FROM users WHERE email = ? AND is_active = 1;",
             (login_request.email.strip().lower(),),
@@ -78,6 +82,7 @@ def login_user(login_request: UserLogin) -> TokenResponse:
             detail="Incorrect email or password",
         )
 
+    # Return both the token and the user profile so the frontend can update immediately.
     return TokenResponse(
         access_token=create_access_token(user["id"]),
         user=serialize_user(user),
@@ -86,4 +91,5 @@ def login_user(login_request: UserLogin) -> TokenResponse:
 
 @router.get("/me", response_model=UserResponse)
 def get_my_profile(current_user=Depends(get_current_user)) -> UserResponse:
+    # Return the signed-in user profile.
     return serialize_user(current_user)

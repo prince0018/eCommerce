@@ -1,14 +1,10 @@
 import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Iterator
 
+from app.paths import DATA_DIR, DATABASE_PATH
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-DATABASE_PATH = DATA_DIR / "catalog.db"
-
-
+# Add any missing product fields by running `ALTER TABLE ... ADD COLUMN`.
 def add_missing_product_columns(connection: sqlite3.Connection) -> None:
     existing_columns = {
         row[1] for row in connection.execute("PRAGMA table_info(products);").fetchall()
@@ -29,17 +25,18 @@ def add_missing_product_columns(connection: sqlite3.Connection) -> None:
             connection.execute(
                 f"ALTER TABLE products ADD COLUMN {column_name} {definition};"
             )
-
-
+# Create the schema tables if they are missing.
 def initialize_database() -> None:
+    # Create the database folder on demand so the app can start from a clean checkout.
     DATA_DIR.mkdir(exist_ok=True)
 
     with sqlite3.connect(DATABASE_PATH) as connection:
+        # Product catalog table.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sku TEXT UNIQUE NOT NULL,
+                sku TEXT UNIQUE NOT NULL,  -- Stock keeping unit, a unique product code
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
                 category TEXT NOT NULL,
@@ -52,7 +49,9 @@ def initialize_database() -> None:
             );
             """
         )
+        # Keep newer product columns available even if the database started with an older schema.
         add_missing_product_columns(connection)
+        # Inventory tracks stock separately from the catalog view.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS inventory_items (
@@ -66,6 +65,7 @@ def initialize_database() -> None:
             );
             """
         )
+        # Orders store the purchase summary.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS orders (
@@ -79,6 +79,7 @@ def initialize_database() -> None:
             );
             """
         )
+        # Each order can contain multiple purchased items.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS order_items (
@@ -95,6 +96,7 @@ def initialize_database() -> None:
             );
             """
         )
+        # Auth users for login and protected routes.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -107,6 +109,7 @@ def initialize_database() -> None:
             );
             """
         )
+        # Shopping cart items belong to a signed-in user.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS cart_items (
@@ -122,6 +125,7 @@ def initialize_database() -> None:
             );
             """
         )
+        # Small key/value table for app-level metadata like last sync time.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS app_metadata (
@@ -130,6 +134,7 @@ def initialize_database() -> None:
             );
             """
         )
+        # Indexes keep the most common product, order, and cart lookups fast.
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);"
         )
@@ -152,6 +157,7 @@ def initialize_database() -> None:
 
 @contextmanager
 def get_connection() -> Iterator[sqlite3.Connection]:
+    # Open one SQLite connection for the current request or job.
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON;")

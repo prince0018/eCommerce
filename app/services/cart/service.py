@@ -5,6 +5,7 @@ from app.services.cart.schemas import CartItemResponse, CartResponse
 
 
 def get_product_for_cart(connection: Connection, product_id: int):
+    # Cart actions need product data plus current stock in one lookup.
     return connection.execute(
         """
         SELECT
@@ -23,6 +24,7 @@ def get_product_for_cart(connection: Connection, product_id: int):
 
 
 def get_user_cart(connection: Connection, user_id: int) -> CartResponse:
+    # Build the full cart response from all stored cart rows for the user.
     rows = connection.execute(
         """
         SELECT
@@ -48,6 +50,7 @@ def get_user_cart(connection: Connection, user_id: int) -> CartResponse:
     currency = "INR"
 
     for row in rows:
+        # Calculate totals while shaping each cart item for the response model.
         unit_price = Decimal(row["price"])
         line_total = unit_price * row["quantity"]
         total_amount += line_total

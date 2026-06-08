@@ -2,6 +2,7 @@ from sqlite3 import Connection
 
 
 def get_inventory_row(connection: Connection, product_id: int):
+    # Inventory is stored separately from product details, so we join both tables here.
     return connection.execute(
         """
         SELECT
@@ -21,6 +22,7 @@ def get_inventory_row(connection: Connection, product_id: int):
 
 
 def set_available_quantity(connection: Connection, product_id: int, quantity: int) -> bool:
+    # Direct admin-style update for the current stock level.
     cursor = connection.execute(
         """
         UPDATE inventory_items
@@ -41,6 +43,7 @@ def set_available_quantity(connection: Connection, product_id: int, quantity: in
 
 
 def reduce_available_stock(connection: Connection, product_id: int, quantity: int) -> bool:
+    # Final stock deduction after a successful order.
     cursor = connection.execute(
         """
         UPDATE inventory_items
@@ -68,6 +71,7 @@ def reduce_available_stock(connection: Connection, product_id: int, quantity: in
 
 
 def reserve_available_stock(connection: Connection, product_id: int, quantity: int) -> bool:
+    # Checkout flow can reserve stock before payment is finalized.
     cursor = connection.execute(
         """
         UPDATE inventory_items

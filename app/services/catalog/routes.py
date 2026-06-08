@@ -17,6 +17,7 @@ router = APIRouter(prefix="/products", tags=["catalog"])
 
 
 def serialize_product(row, include_source_data: bool = False):
+    # Convert one product row into an API model.
     response_type = ProductResponse if include_source_data else ProductSummary
     response_data = dict(
         id=row["id"],
@@ -53,6 +54,7 @@ def list_products(
     search: str | None = Query(default=None, min_length=2),
     in_stock: bool | None = None,
 ) -> ProductListResponse:
+    # Return products with optional filters.
     query = """
         SELECT
             products.*,
@@ -88,6 +90,7 @@ def list_products(
 
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: int) -> ProductResponse:
+    # Return one active product.
     with get_connection() as connection:
         row = connection.execute(
             """
@@ -112,6 +115,7 @@ def get_product(product_id: int) -> ProductResponse:
 
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 def create_product(product: ProductCreate) -> ProductResponse:
+    # Create a new product and seed its inventory.
     with get_connection() as connection:
         try:
             cursor = connection.execute(
@@ -173,6 +177,7 @@ def create_product(product: ProductCreate) -> ProductResponse:
 
 @router.patch("/{product_id}/stock", response_model=ProductResponse)
 def update_stock(product_id: int, stock_update: StockUpdate) -> ProductResponse:
+    # Update product stock in both tables.
     with get_connection() as connection:
         cursor = connection.execute(
             """
