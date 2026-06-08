@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -12,47 +14,31 @@ class ProductCreate(BaseModel):
     price: Decimal = Field(..., gt=0)
     currency: str = Field(default="INR", min_length=3, max_length=3)
     stock_quantity: int = Field(..., ge=0)
+    thumbnail: str | None = None
+    images: list[str] = Field(default_factory=list)
 
 
-class ProductResponse(ProductCreate):
+class ProductSummary(ProductCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     is_active: bool
     created_at: str
+    source: str
+    source_price_usd: Decimal | None = None
+    discount_percentage: float | None = None
+    rating: float | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class ProductResponse(ProductSummary):
+    source_data: dict[str, Any] | None = None
 
 
 class ProductListResponse(BaseModel):
     count: int
-    products: list[ProductResponse]
+    products: list[ProductSummary]
 
 
 class StockUpdate(BaseModel):
     stock_quantity: int = Field(..., ge=0)
-
-
-class InventoryItemResponse(BaseModel):
-    product_id: int
-    sku: str
-    product_name: str
-    available_quantity: int
-    reserved_quantity: int
-    sold_quantity: int
-    updated_at: str
-
-
-class InventoryListResponse(BaseModel):
-    count: int
-    inventory: list[InventoryItemResponse]
-
-
-class InventoryQuantityUpdate(BaseModel):
-    available_quantity: int = Field(..., ge=0)
-
-
-class InventoryReserveRequest(BaseModel):
-    quantity: int = Field(..., gt=0)
-
-
-class InventoryPurchaseRequest(BaseModel):
-    quantity: int = Field(..., gt=0)

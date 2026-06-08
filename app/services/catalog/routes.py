@@ -1,16 +1,24 @@
+import json
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.database import get_connection
-from app.schemas import ProductCreate, ProductListResponse, ProductResponse, StockUpdate
+from app.services.catalog.schemas import (
+    ProductCreate,
+    ProductListResponse,
+    ProductResponse,
+    ProductSummary,
+    StockUpdate,
+)
 
 
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(prefix="/products", tags=["catalog"])
 
 
-def serialize_product(row) -> ProductResponse:
-    return ProductResponse(
+def serialize_product(row, include_source_data: bool = False):
+    response_type = ProductResponse if include_source_data else ProductSummary
+    response_data = dict(
         id=row["id"],
         sku=row["sku"],
         name=row["name"],
@@ -20,9 +28,23 @@ def serialize_product(row) -> ProductResponse:
         price=Decimal(row["price"]),
         currency=row["currency"],
         stock_quantity=row["current_stock"] if "current_stock" in row.keys() else row["stock_quantity"],
+        thumbnail=row["thumbnail"],
+        images=json.loads(row["images_json"] or "[]"),
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
+        source=row["source"],
+        source_price_usd=(
+            Decimal(row["source_price_usd"]) if row["source_price_usd"] else None
+        ),
+        discount_percentage=row["discount_percentage"],
+        rating=row["rating"],
+        tags=json.loads(row["tags_json"] or "[]"),
     )
+    if include_source_data:
+        response_data["source_data"] = (
+            json.loads(row["raw_json"]) if row["raw_json"] else None
+        )
+    return response_type(**response_data)
 
 
 @router.get("", response_model=ProductListResponse)
@@ -85,7 +107,7 @@ def get_product(product_id: int) -> ProductResponse:
             detail="Product not found",
         )
 
-    return serialize_product(row)
+    return serialize_product(row, include_source_data=True)
 
 
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
@@ -95,9 +117,18 @@ def create_product(product: ProductCreate) -> ProductResponse:
             cursor = connection.execute(
                 """
                 INSERT INTO products (
-                    sku, name, description, category, brand, price, currency, stock_quantity
+                    sku,
+                    name,
+                    description,
+                    category,
+                    brand,
+                    price,
+                    currency,
+                    stock_quantity,
+                    thumbnail,
+                    images_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     product.sku,
@@ -108,6 +139,8 @@ def create_product(product: ProductCreate) -> ProductResponse:
                     str(product.price),
                     product.currency.upper(),
                     product.stock_quantity,
+                    product.thumbnail,
+                    json.dumps(product.images),
                 ),
             )
         except Exception as exc:
@@ -135,7 +168,7 @@ def create_product(product: ProductCreate) -> ProductResponse:
             (row["id"], row["sku"], row["stock_quantity"]),
         )
 
-    return serialize_product(row)
+    return serialize_product(row, include_source_data=True)
 
 
 @router.patch("/{product_id}/stock", response_model=ProductResponse)
@@ -180,4 +213,4 @@ def update_stock(product_id: int, stock_update: StockUpdate) -> ProductResponse:
             (product_id,),
         ).fetchone()
 
-    return serialize_product(row)
+    return serialize_product(row, include_source_data=True)

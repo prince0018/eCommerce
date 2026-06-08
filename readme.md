@@ -1,6 +1,6 @@
 # eCommerce Platform
 
-This repository is being rebuilt from a fresh starting point. The first services are a Catalog Service for product information and an Inventory Service for stock tracking.
+This repository is being rebuilt from a fresh starting point. It currently contains Catalog, Inventory, Order, Auth/User, and Cart services. Product data is imported from the DummyJSON Products API.
 
 ## High-Level Design
 
@@ -10,9 +10,12 @@ Start with a small, working system and grow it into microservices as the domain 
 
 - Browse products.
 - View product details.
-- Store product descriptions, prices, categories, and stock quantities.
-- Support checkout later by allowing stock to be read and eventually reduced.
-- Keep order, payment, cart, and user services as planned future modules.
+- Import product descriptions, images, prices, categories, ratings, and stock from DummyJSON.
+- Convert source USD prices to INR during import.
+- Create orders and reduce stock for purchased products.
+- Register users, authenticate them, and protect user-specific APIs.
+- Maintain a separate shopping cart for each authenticated user.
+- Keep payment and notification services as planned future modules.
 
 ## Suggested Services
 
@@ -28,7 +31,7 @@ Start with a small, working system and grow it into microservices as the domain 
 
 ## First Version Scope
 
-The first build starts with Catalog and Inventory inside one FastAPI application. The code is separated by route modules so these domains can later become independent services.
+The first build keeps the services inside one FastAPI application. Each domain has its own service folder so its API contracts and logic are easy to identify and can later become an independent microservice.
 
 ## Architecture Workflow
 
@@ -113,8 +116,34 @@ The current service uses FastAPI and SQLite.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+export JWT_SECRET="replace-with-a-long-random-secret"
+export USD_TO_INR_RATE="95.5"
 uvicorn app.main:app --reload
 ```
+
+Open `http://127.0.0.1:8000` for the storefront or
+`http://127.0.0.1:8000/docs` for the API documentation.
+
+### Catalog Import
+
+The app checks for updated DummyJSON products during startup. It refreshes the
+catalog once every 24 hours by default and uses
+`data/dummyjson_products.json` if the external API is unavailable.
+
+Run a forced import manually:
+
+```bash
+python -m app.catalog_import
+```
+
+Configuration:
+
+- `USD_TO_INR_RATE`: USD-to-INR conversion rate. Default: `95.5`.
+- `DUMMYJSON_SYNC_INTERVAL_HOURS`: Catalog refresh interval. Default: `24`.
+- `DUMMYJSON_USE_CACHE_ONLY`: Use the checked-in API snapshot without network access.
+
+Inventory quantities are initialized from DummyJSON during the first import.
+Later catalog refreshes preserve local stock changes made by orders.
 
 ### API Endpoints
 
@@ -130,6 +159,38 @@ uvicorn app.main:app --reload
 - `PATCH /inventory/{product_id}`: Set available stock quantity.
 - `POST /inventory/{product_id}/reserve`: Reserve stock during checkout.
 - `POST /inventory/{product_id}/purchase`: Reduce stock after purchase.
+- `GET /orders`: List orders.
+- `GET /orders/{order_id}`: Read an order and its items.
+- `POST /orders`: Create an order and reduce inventory stock.
+- `POST /auth/register`: Register a user.
+- `POST /auth/login`: Authenticate and receive a Bearer token.
+- `GET /auth/me`: Read the authenticated user's profile.
+- `GET /cart`: Read the authenticated user's cart.
+- `POST /cart/items`: Add a product to the cart.
+- `PATCH /cart/items/{product_id}`: Change a cart item quantity.
+- `DELETE /cart/items/{product_id}`: Remove one cart item.
+- `DELETE /cart`: Clear the cart.
+- `POST /cart/checkout`: Create an order from the authenticated user's cart.
+
+Protected endpoints require:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+### Create Order Example
+
+```json
+{
+  "customer_id": "customer-001",
+  "items": [
+    {
+      "product_id": 1,
+      "quantity": 2
+    }
+  ]
+}
+```
 
 ## Project Structure
 
@@ -137,17 +198,48 @@ uvicorn app.main:app --reload
 app/
   main.py
   database.py
-  models.py
-  schemas.py
-  seed.py
-  routes/
-    products.py
-    inventory.py
+  catalog_import.py
+  frontend/
+    index.html
+    styles.css
+    app.js
+  services/
+    catalog/
+      routes.py
+      schemas.py
+    inventory/
+      routes.py
+      schemas.py
+      service.py
+    orders/
+      routes.py
+      schemas.py
+    auth/
+      routes.py
+      schemas.py
+      security.py
+    cart/
+      routes.py
+      schemas.py
+      service.py
 .github/
   workflows/
     ci.yml
 data/
   catalog.db
+  dummyjson_products.json
 tests/
 requirements.txt
 ```
+
+Each service folder has a clear responsibility:
+
+- `catalog`: Product information and product APIs.
+- `inventory`: Available, reserved, and sold stock.
+- `orders`: Order creation, order history, and purchased items.
+- `auth`: User registration, password hashing, login, and JWT authentication.
+- `cart`: Authenticated user carts, quantities, and calculated totals.
+- `frontend`: Responsive storefront, authentication, cart, and checkout interface.
+- `catalog_import.py`: DummyJSON synchronization and USD-to-INR conversion.
+- `main.py`: Registers each service with FastAPI.
+- `database.py`: Shared database connection and tables for the current modular-monolith stage.

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3ee">
+  <title>Common Goods</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="announcement">
+    <span>Free delivery on orders over ₹2,500</span>
+    <span class="announcement-detail">Easy returns within 14 days</span>
+  </div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Common Goods home">
+      <span class="brand-mark">CG</span>
+      <span>Common Goods</span>
+    </a>
+    <nav class="main-nav" aria-label="Primary navigation">
+      <a href="#catalog">New arrivals</a>
+      <button type="button" data-nav-category="smartphones">Technology</button>
+      <button type="button" data-nav-category="furniture">Home</button>
+      <button type="button" data-nav-category="mens-shirts">Style</button>
+    </nav>
+    <nav class="header-actions" aria-label="Account and cart">
+      <button class="icon-button" id="accountButton" type="button" aria-label="Account" title="Account">
+        <i data-lucide="user-round"></i>
+      </button>
+      <button class="cart-button" id="cartButton" type="button" aria-label="Open cart">
+        <i data-lucide="shopping-bag"></i>
+        <span>Bag</span>
+        <strong id="cartCount">0</strong>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">The everyday edit · 2026</p>
+        <h1>Good design.<br>Better days.</h1>
+        <p>A considered collection of technology, homeware, beauty, and style. Chosen for how well they work and how good they feel to use.</p>
+        <div class="hero-actions">
+          <a class="hero-primary" href="#catalog">Shop new arrivals <i data-lucide="arrow-right"></i></a>
+          <button class="hero-secondary" type="button" data-nav-category="furniture">Explore home</button>
+        </div>
+        <div class="hero-proof">
+          <span><strong>194</strong> curated products</span>
+          <span><strong>4.8</strong> average customer rating</span>
+        </div>
+      </div>
+      <div class="hero-gallery" aria-label="Featured products">
+        <article class="hero-feature hero-feature-main" id="heroMain">
+          <div class="hero-product-copy">
+            <span>Featured today</span>
+            <strong>Loading collection</strong>
+          </div>
+        </article>
+        <article class="hero-feature hero-feature-small" id="heroSmallOne"></article>
+        <article class="hero-feature hero-feature-small" id="heroSmallTwo"></article>
+      </div>
+    </section>
+
+    <section class="benefit-strip" aria-label="Shopping benefits">
+      <div><i data-lucide="truck"></i><span><strong>Fast delivery</strong> across India</span></div>
+      <div><i data-lucide="badge-check"></i><span><strong>Quality checked</strong> before dispatch</span></div>
+      <div><i data-lucide="rotate-ccw"></i><span><strong>Simple returns</strong> within 14 days</span></div>
+      <div><i data-lucide="shield-check"></i><span><strong>Secure checkout</strong> every time</span></div>
+    </section>
+
+    <section class="category-editorial">
+      <div class="section-intro">
+        <p class="eyebrow">Shop by department</p>
+        <h2>Find your next favourite.</h2>
+      </div>
+      <div class="department-grid">
+        <button class="department department-tech" type="button" data-nav-category="smartphones">
+          <span>Technology</span><i data-lucide="arrow-up-right"></i>
+        </button>
+        <button class="department department-home" type="button" data-nav-category="furniture">
+          <span>Home</span><i data-lucide="arrow-up-right"></i>
+        </button>
+        <button class="department department-beauty" type="button" data-nav-category="beauty">
+          <span>Beauty</span><i data-lucide="arrow-up-right"></i>
+        </button>
+        <button class="department department-style" type="button" data-nav-category="mens-shirts">
+          <span>Style</span><i data-lucide="arrow-up-right"></i>
+        </button>
+      </div>
+    </section>
+
+    <section class="catalog-section" id="catalog">
+      <div class="catalog-heading">
+        <div>
+          <p class="eyebrow">The complete collection</p>
+          <h2>Made for everyday.</h2>
+        </div>
+        <label class="search-field">
+          <i data-lucide="search"></i>
+          <input id="searchInput" type="search" placeholder="Search the catalog" autocomplete="off">
+        </label>
+      </div>
+      <div class="category-strip" id="categoryStrip" aria-label="Product categories"></div>
+      <div class="catalog-meta">
+        <p id="catalogCount">Loading products...</p>
+        <label class="sort-field">
+          <span>Sort by</span>
+          <select id="sortSelect" aria-label="Sort products">
+            <option value="featured">Featured</option>
+            <option value="rating">Top rated</option>
+            <option value="price-low">Price: low to high</option>
+            <option value="price-high">Price: high to low</option>
+            <option value="name">Name</option>
+          </select>
+        </label>
+      </div>
+      <div class="product-grid" id="productGrid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <span class="brand-mark">CG</span>
+      <h2>Things worth having.</h2>
+    </div>
+    <p>Common Goods is a demonstration storefront built around a practical, modern shopping experience.</p>
+    <a href="/docs">Explore the API <i data-lucide="arrow-up-right"></i></a>
+  </footer>
+
+  <aside class="drawer" id="cartDrawer" aria-hidden="true" aria-label="Shopping cart">
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">Your selection</p>
+        <h2>Shopping bag</h2>
+      </div>
+      <button class="icon-button" id="closeCartButton" type="button" aria-label="Close cart" title="Close cart">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="drawer-body" id="cartItems"></div>
+    <div class="drawer-footer">
+      <div class="cart-total">
+        <span>Total</span>
+        <strong id="cartTotal">₹0</strong>
+      </div>
+      <button class="primary-button" id="checkoutButton" type="button">
+        Checkout
+        <i data-lucide="arrow-right"></i>
+      </button>
+      <p class="checkout-note">Demo checkout. No payment details are collected.</p>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <dialog class="modal auth-modal" id="authModal">
+    <button class="modal-close icon-button" data-close-modal type="button" aria-label="Close" title="Close">
+      <i data-lucide="x"></i>
+    </button>
+    <div id="accountView">
+      <p class="eyebrow">Your account</p>
+      <h2 id="accountName">Welcome back</h2>
+      <p id="accountEmail"></p>
+      <button class="secondary-button" id="logoutButton" type="button">Log out</button>
+    </div>
+    <div id="authView">
+      <p class="eyebrow">Welcome to Common Goods</p>
+      <h2 id="authTitle">Sign in</h2>
+      <div class="auth-tabs">
+        <button class="active" data-auth-mode="login" type="button">Sign in</button>
+        <button data-auth-mode="register" type="button">Create account</button>
+      </div>
+      <form id="authForm">
+        <label class="form-field register-only">
+          <span>Full name</span>
+          <input id="fullNameInput" type="text" autocomplete="name">
+        </label>
+        <label class="form-field">
+          <span>Email</span>
+          <input id="emailInput" type="email" autocomplete="email" required>
+        </label>
+        <label class="form-field">
+          <span>Password</span>
+          <input id="passwordInput" type="password" autocomplete="current-password" minlength="8" required>
+        </label>
+        <button class="primary-button" id="authSubmitButton" type="submit">Sign in</button>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog class="modal product-modal" id="productModal">
+    <button class="modal-close icon-button" data-close-modal type="button" aria-label="Close" title="Close">
+      <i data-lucide="x"></i>
+    </button>
+    <div id="productModalContent"></div>
+  </dialog>
+
+  <dialog class="modal success-modal" id="successModal">
+    <div class="success-symbol"><i data-lucide="check"></i></div>
+    <p class="eyebrow">Order confirmed</p>
+    <h2>It’s on the books.</h2>
+    <p id="successMessage"></p>
+    <button class="primary-button" data-close-modal type="button">Keep shopping</button>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

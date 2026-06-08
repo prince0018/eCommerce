@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}
+      DUMMYJSON_USE_CACHE_ONLY: "true"
 
     steps:
       - name: Checkout repository

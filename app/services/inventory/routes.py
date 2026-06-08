@@ -1,12 +1,18 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.database import get_connection
-from app.schemas import (
+from app.services.inventory.schemas import (
     InventoryItemResponse,
     InventoryListResponse,
     InventoryPurchaseRequest,
     InventoryQuantityUpdate,
     InventoryReserveRequest,
+)
+from app.services.inventory.service import (
+    get_inventory_row,
+    reduce_available_stock,
+    reserve_available_stock,
+    set_available_quantity,
 )
 
 
@@ -23,25 +29,6 @@ def serialize_inventory(row) -> InventoryItemResponse:
         sold_quantity=row["sold_quantity"],
         updated_at=row["updated_at"],
     )
-
-
-def get_inventory_row(connection, product_id: int):
-    return connection.execute(
-        """
-        SELECT
-            inventory_items.product_id,
-            inventory_items.sku,
-            products.name AS product_name,
-            inventory_items.available_quantity,
-            inventory_items.reserved_quantity,
-            inventory_items.sold_quantity,
-            inventory_items.updated_at
-        FROM inventory_items
-        JOIN products ON products.id = inventory_items.product_id
-        WHERE inventory_items.product_id = ? AND products.is_active = 1;
-        """,
-        (product_id,),
-    ).fetchone()
 
 
 @router.get("", response_model=InventoryListResponse)
@@ -83,30 +70,21 @@ def get_inventory(product_id: int) -> InventoryItemResponse:
 
 
 @router.patch("/{product_id}", response_model=InventoryItemResponse)
-def set_available_quantity(
+def update_available_quantity(
     product_id: int,
     quantity_update: InventoryQuantityUpdate,
 ) -> InventoryItemResponse:
     with get_connection() as connection:
-        cursor = connection.execute(
-            """
-            UPDATE inventory_items
-            SET available_quantity = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE product_id = ?;
-            """,
-            (quantity_update.available_quantity, product_id),
-        )
-
-        if cursor.rowcount == 0:
+        if not set_available_quantity(
+            connection,
+            product_id,
+            quantity_update.available_quantity,
+        ):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Inventory item not found",
             )
 
-        connection.execute(
-            "UPDATE products SET stock_quantity = ? WHERE id = ?;",
-            (quantity_update.available_quantity, product_id),
-        )
         row = get_inventory_row(connection, product_id)
 
     return serialize_inventory(row)
@@ -125,31 +103,12 @@ def reserve_stock(
                 detail="Inventory item not found",
             )
 
-        if row["available_quantity"] < reserve_request.quantity:
+        if not reserve_available_stock(connection, product_id, reserve_request.quantity):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Not enough stock available",
             )
 
-        connection.execute(
-            """
-            UPDATE inventory_items
-            SET
-                available_quantity = available_quantity - ?,
-                reserved_quantity = reserved_quantity + ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE product_id = ?;
-            """,
-            (reserve_request.quantity, reserve_request.quantity, product_id),
-        )
-        connection.execute(
-            """
-            UPDATE products
-            SET stock_quantity = stock_quantity - ?
-            WHERE id = ?;
-            """,
-            (reserve_request.quantity, product_id),
-        )
         updated_row = get_inventory_row(connection, product_id)
 
     return serialize_inventory(updated_row)
@@ -168,31 +127,12 @@ def purchase_stock(
                 detail="Inventory item not found",
             )
 
-        if row["available_quantity"] < purchase_request.quantity:
+        if not reduce_available_stock(connection, product_id, purchase_request.quantity):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Not enough stock available",
             )
 
-        connection.execute(
-            """
-            UPDATE inventory_items
-            SET
-                available_quantity = available_quantity - ?,
-                sold_quantity = sold_quantity + ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE product_id = ?;
-            """,
-            (purchase_request.quantity, purchase_request.quantity, product_id),
-        )
-        connection.execute(
-            """
-            UPDATE products
-            SET stock_quantity = stock_quantity - ?
-            WHERE id = ?;
-            """,
-            (purchase_request.quantity, product_id),
-        )
         updated_row = get_inventory_row(connection, product_id)
 
     return serialize_inventory(updated_row)
