@@ -1,317 +1,153 @@
-# eCommerce API
+# eCommerce Platform
 
-A Python-based REST API for managing an online store with product inventory, shopping cart, and user authentication.
+This repository is being rebuilt from a fresh starting point. The first services are a Catalog Service for product information and an Inventory Service for stock tracking.
 
-## Overview
+## High-Level Design
 
-This is a starter eCommerce platform built with:
-- **FastAPI** — modern, fast web framework for APIs
-- **PostgreSQL** — relational database for products, users, and cart data
-- **OAuth2 + JWT** — secure user authentication and token-based access control
-- **Pydantic** — request/response validation
+Start with a small, working system and grow it into microservices as the domain becomes clearer. For the first version, a modular monolith or a few simple services is easier to build, test, and understand than many distributed services.
 
-## Features
+## MVP Capabilities
 
-### Product Management
-- List all products from inventory with details (price, stock, description).
-- Seed initial product data into the database.
-- Filter and search products.
+- Browse products.
+- View product details.
+- Store product descriptions, prices, categories, and stock quantities.
+- Support checkout later by allowing stock to be read and eventually reduced.
+- Keep order, payment, cart, and user services as planned future modules.
 
-### User Authentication
-- User registration (email, password, full name).
-- Login via username/password to receive JWT access token.
-- Token-based authentication for protected endpoints.
-- User data persisted in PostgreSQL.
+## Suggested Services
 
-### Shopping Cart
-- Add products to cart (per user).
-- View cart contents with product details and total price.
-- Update quantity or remove items.
-- Clear entire cart.
+- API Gateway: Single entry point for frontend requests.
+- Auth/User Service: Signup, login, user profile, and token handling.
+- Catalog Service: Product title, description, images, category, brand, and price.
+- Inventory Service: Stock quantity, availability, reserve stock, and release stock.
+- Cart Service: Temporary shopping cart before checkout.
+- Order Service: Order creation, order status, and order history.
+- Payment Service: Payment initiation and confirmation.
+- Notification Service: Email or SMS confirmation.
+- Admin Service: Product and stock management for internal users.
 
-### Checkout
-- Calculate checkout totals from cart items.
+## First Version Scope
+
+The first build starts with Catalog and Inventory inside one FastAPI application. The code is separated by route modules so these domains can later become independent services.
+
+## Architecture Workflow
+
+```mermaid
+flowchart LR
+  U[User / Frontend] --> G[API Gateway]
+
+  G --> A[Auth Service]
+  G --> C[Catalog Service]
+  G --> I[Inventory Service]
+  G --> R[Cart Service]
+  G --> O[Order Service]
+  G --> P[Payment Service]
+  G --> N[Notification Service]
+
+  C --> PC[(Catalog DB)]
+  I --> PI[(Inventory DB)]
+  R --> PR[(Cart DB / Redis)]
+  O --> PO[(Order DB)]
+  A --> PA[(User DB)]
+  P --> PP[(Payment DB / Provider)]
+
+  O --> MQ[(Message Queue)]
+  P --> MQ
+  I --> MQ
+  MQ --> N
+```
+
+## Service Ownership
+
+- Catalog Service answers: What is the product?
+- Inventory Service answers: How many units are available?
+- Cart Service answers: What does the user want to buy?
+- Order Service answers: What was purchased?
+- Payment Service answers: Did payment succeed?
+- Notification Service answers: Who needs to be informed?
+
+## Purchase Workflow
+
+1. User opens the product listing page.
+2. Frontend calls Catalog Service for product data.
+3. User opens one product and reads details.
+4. User adds product to cart.
+5. Cart Service stores selected items.
+6. User checks out.
+7. Order Service creates a pending order.
+8. Inventory Service checks stock.
+9. Inventory Service reserves or deducts stock.
+10. Payment Service processes payment.
+11. Order Service marks the order as confirmed.
+12. Notification Service sends confirmation.
+
+## Stock Handling
+
+For the final architecture, prefer reserve-then-confirm:
+
+- Reserve stock when checkout starts.
+- Confirm stock deduction after payment succeeds.
+- Release stock if payment fails or the checkout expires.
+
+For this first implementation, Catalog still exposes stock quantity for product-listing convenience, but Inventory is now the source for stock operations such as setting, reserving, and purchasing stock.
+
+## Build Order
+
+1. Catalog Service.
+2. Inventory Service.
+3. Order Service.
+4. Auth/User Service.
+5. Cart Service.
+6. Payment flow.
+7. Notification Service.
+8. Admin product management.
+9. Search, recommendations, reviews, and analytics.
+
+## Current Services
+
+The current service uses FastAPI and SQLite.
+
+### Run Locally
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+### API Endpoints
+
+- `GET /health`: Service health check.
+- `GET /products`: List all active products.
+- `GET /products?category=electronics`: Filter by category.
+- `GET /products?search=phone`: Search by name or description.
+- `GET /products/{product_id}`: Read one product.
+- `POST /products`: Create a product.
+- `PATCH /products/{product_id}/stock`: Update product stock quantity.
+- `GET /inventory`: List inventory for active products.
+- `GET /inventory/{product_id}`: Read inventory for one product.
+- `PATCH /inventory/{product_id}`: Set available stock quantity.
+- `POST /inventory/{product_id}/reserve`: Reserve stock during checkout.
+- `POST /inventory/{product_id}/purchase`: Reduce stock after purchase.
 
 ## Project Structure
 
+```text
+app/
+  main.py
+  database.py
+  models.py
+  schemas.py
+  seed.py
+  routes/
+    products.py
+    inventory.py
+.github/
+  workflows/
+    ci.yml
+data/
+  catalog.db
+tests/
+requirements.txt
 ```
-eCommerce/
-├── main.py                    # FastAPI app entrypoint, router registration
-├── .env                       # Environment variables (DB, secrets)
-├── requirements.txt           # Python dependencies
-├── readme.md                  # This file
-├── constants/
-│   └── constants.py           # App-wide constants
-├── src/
-│   ├── api/
-│   │   └── routes/            # FastAPI route handlers
-│   │       ├── auth.py
-│   │       ├── cart.py
-│   │       ├── checkout.py
-│   │       └── products.py
-│   ├── core/                  # Shared config and security helpers
-│   │   ├── config.py
-│   │   └── security.py
-│   ├── db/                    # Database connection and seeding
-│   │   ├── connection.py
-│   │   └── seeding.py
-│   ├── repositories/          # SQL/database access functions
-│   │   ├── cart_repository.py
-│   │   ├── product_repository.py
-│   │   └── user_repository.py
-│   ├── schemas/               # Pydantic request models
-│   │   ├── auth.py
-│   │   └── cart.py
-│   └── services/              # Business logic
-│       ├── auth_service.py
-│       ├── cart_service.py
-│       ├── checkout_service.py
-│       └── product_service.py
-└── tests/                     # Unit tests (coming soon)
-```
-
-## Setup & Installation
-
-### Prerequisites
-- Python 3.8+
-- PostgreSQL 12+
-- pip (Python package manager)
-
-### Step 1: Clone & Navigate
-```bash
-cd /Users/prince/dev/projects/genAI/python_projects/eCommerce
-```
-
-### Step 2: Create Virtual Environment
-```bash
-python3 -m venv .venv
-source .venv/bin/activate  # On macOS/Linux
-# or: .venv\Scripts\activate  # On Windows
-```
-
-### Step 3: Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### Step 4: Configure Environment
-Create/update `.env` file with your PostgreSQL credentials:
-```env
-DB_NAME=inventory_db
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_HOST=localhost
-DB_PORT=5432
-SECRET_KEY=your-secret-key-here
-```
-
-### Step 5: Seed Data
-Run the seeding script to create tables and populate initial products:
-```bash
-python -m src.db.seeding
-```
-
-## Running the Application
-
-### Option 1: Module Mode (Recommended)
-```bash
-uvicorn main:app --reload
-```
-
-### Option 2: Direct Run
-```bash
-python main.py
-```
-
-The API will be available at `http://localhost:8000`.
-
-Interactive API docs: `http://localhost:8000/docs`
-
-## API Endpoints
-
-### Authentication
-- `POST /auth/register` — Create new user account
-  - Body: `{ "email": "user@example.com", "password": "secret", "full_name": "John Doe" }`
-  - Returns: user id, email, full_name
-
-- `POST /auth/token` — Login and get access token
-  - Body: `{ "email": "user@example.com", "password": "secret" }`
-  - Returns: `{ "access_token": "...", "token_type": "bearer" }`
-
-- `GET /auth/me` — Get the authenticated user profile
-  - Header: `Authorization: Bearer {access_token}`
-  - Returns: user id, email, full_name, created_at
-
-### Inventory
-- `GET /inventory/products` — List all products
-  - Returns: array of products with id, name, description, stock, price, created_at
-
-### Cart (Requires Authentication)
-- `POST /cart/add` — Add product to cart
-  - Header: `Authorization: Bearer {access_token}`
-  - Body: `{ "user_id": 1, "product_id": 5, "quantity": 2 }`
-  - Returns: success message
-
-- `GET /cart/{user_id}` — Get user's cart
-  - Header: `Authorization: Bearer {access_token}`
-  - Returns: cart items with totals and grand total
-
-- `PUT /cart/update` — Update cart item quantity
-  - Header: `Authorization: Bearer {access_token}`
-  - Body: `{ "user_id": 1, "product_id": 5, "quantity": 3 }`
-  - Returns: success message
-
-- `DELETE /cart/clear` — Clear entire cart
-  - Header: `Authorization: Bearer {access_token}`
-  - Body: `{ "user_id": 1 }`
-  - Returns: success message
-
-### Checkout
-- `GET /cart/checkout/{user_id}` — Calculate checkout totals from cart
-  - Header: `Authorization: Bearer {access_token}`
-  - Returns: cart items, subtotal, tax, delivery fee, and total amount
-
-## Database Schema
-
-### users
-```sql
-id (SERIAL PRIMARY KEY)
-email (TEXT UNIQUE NOT NULL)
-full_name (TEXT)
-hashed_password (TEXT NOT NULL)
-created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-```
-
-### products
-```sql
-id (SERIAL PRIMARY KEY)
-name (TEXT UNIQUE NOT NULL)
-description (TEXT)
-stock (INT NOT NULL)
-price (NUMERIC NOT NULL)
-created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-```
-
-### cart
-```sql
-id (SERIAL PRIMARY KEY)
-user_id (INT NOT NULL FOREIGN KEY -> users.id)
-product_id (INT NOT NULL FOREIGN KEY -> products.id)
-quantity (INT NOT NULL)
-created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-UNIQUE(user_id, product_id)
-```
-
-### orders (optional, for checkout)
-```sql
-id (SERIAL PRIMARY KEY)
-user_id (INT NOT NULL FOREIGN KEY -> users.id)
-total_price (NUMERIC(12,2))
-status (TEXT DEFAULT 'pending')
-created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-```
-
-## Usage Example (Flow)
-
-1. **Register a user**
-   ```bash
-   curl -X POST http://localhost:8000/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"email":"john@example.com", "password":"secure123", "full_name":"John Doe"}'
-   ```
-
-2. **Login and get token**
-   ```bash
-   curl -X POST http://localhost:8000/auth/token \
-     -H "Content-Type: application/json" \
-     -d '{"email":"john@example.com", "password":"secure123"}'
-   ```
-
-3. **Browse products**
-   ```bash
-   curl http://localhost:8000/inventory/products
-   ```
-
-4. **Add to cart** (use token from step 2)
-   ```bash
-   curl -X POST http://localhost:8000/cart/add \
-     -H "Authorization: Bearer <ACCESS_TOKEN>" \
-     -H "Content-Type: application/json" \
-     -d '{"user_id":1, "product_id":3, "quantity":2}'
-   ```
-
-5. **View cart**
-   ```bash
-   curl -H "Authorization: Bearer <ACCESS_TOKEN>" \
-     http://localhost:8000/cart/1
-   ```
-
-6. **Checkout**
-   ```bash
-   curl -H "Authorization: Bearer <ACCESS_TOKEN>" \
-     http://localhost:8000/cart/checkout/1
-   ```
-
-## Future Enhancements
-
-- [ ] Social login (Google, GitHub OAuth).
-- [ ] Email verification on registration.
-- [ ] Product search and filtering.
-- [ ] Payment gateway integration (Stripe, Razorpay).
-- [ ] Order history and tracking.
-- [ ] Product reviews and ratings.
-- [ ] Admin dashboard for inventory management.
-- [ ] Unit and integration tests (pytest).
-- [ ] API rate limiting and security headers.
-- [ ] Docker containerization.
-
-## Notes & Best Practices
-
-- Keep `.env` file with secrets **out of version control** (already in `.gitignore`).
-- Use strong SECRET_KEY in production (generate with `openssl rand -hex 32`).
-- Always use HTTPS in production.
-- Set short token expiration times and implement refresh tokens.
-- Validate user input and use Pydantic models.
-- Convert currency values to Decimal type to avoid float rounding errors.
-- Add unit tests before adding new features.
-
-## Troubleshooting
-
-### Import errors (ModuleNotFoundError)
-- Run with: `uvicorn main:app --reload`
-- Or ensure `src/` folder has `__init__.py` files.
-
-### Database connection fails
-- Check `.env` credentials match your PostgreSQL setup.
-- Ensure PostgreSQL is running: `psql -U postgres`
-- Verify database exists: `psql -l` or run seeding script.
-
-### No products in inventory
-- Run: `python -m src.db.seeding` to populate initial data.
-
-## License & Contribution
-
-This is a starter project — adapt and extend freely. Open issues or PRs for improvements.
-
-## Contact
-
-For questions, reach out or check the project issues.
-### User Authentication & Data Management
-
-The application implements a user-based authentication system using JSON Web Tokens (JWT). A single shared database schema is used to manage all users and their associated data.
-
-A centralized table structure is maintained for entities such as cart_items and wishlist, where each record is linked to a specific user through a user_id field. Instead of creating separate tables per user, this approach ensures scalability and efficient data management.
-
-When a user logs in, a JWT token containing the user_id is generated. For every authenticated request, this token is sent in the request header and decoded on the backend to extract the user's identity.
-
-Using this user_id, SQL queries are executed to retrieve user-specific data. For example:
-
-- Fetch cart items:
-  SELECT * FROM cart_items WHERE user_id = <user_id>;
-
-- Fetch wishlist items:
-  SELECT * FROM wishlist WHERE user_id = <user_id>;
-
-This design allows multiple users to share the same tables while ensuring that each user can only access their own data through backend-controlled queries.
-
-Overall, the system follows a scalable and secure approach by combining JWT-based authentication with relational database design using user-specific filtering.

@@ -1,20 +1,8 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.sqlite3
-
-# Virtual environment
 .venv/
-venv/
-env/
-
-# Environment variables (IMPORTANT)
+__pycache__/
+*.py[cod]
 .env
-
-# VS Code
-.vscode/
-
-# Mac
 .DS_Store
+data/*.db
+data/*.db-shm
+data/*.db-wal
