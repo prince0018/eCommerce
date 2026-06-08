@@ -12,6 +12,8 @@ jobs:
   test:
     name: Test before deployment
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout repository
@@ -32,7 +34,7 @@ jobs:
         run: python -m compileall app tests
 
       - name: Run tests
-        run: pytest -q
+        run: python -m pytest -q
 
   deploy:
     name: Deploy
