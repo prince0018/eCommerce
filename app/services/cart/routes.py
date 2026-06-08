@@ -149,7 +149,7 @@ def checkout_cart(current_user=Depends(get_current_user)) -> OrderResponse:
 
     order = create_order(
         OrderCreate(
-            customer_id=str(current_user["id"]),
+            customer_id=f"user-{current_user['id']}",
             items=[
                 OrderItemCreate(
                     product_id=item.product_id,
