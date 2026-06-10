@@ -1,140 +1,145 @@
 # eCommerce Platform
 
-This project is a FastAPI-based eCommerce backend with a simple frontend, SQLite persistence, authentication, cart, catalog, inventory, and order flows.
+This repository is being rebuilt from a fresh starting point. The first service is a Catalog Service that stores product information and exposes APIs for listing and reading products.
 
-The application starts from [`app/main.py`](./app/main.py). On startup it:
+## High-Level Design
 
-1. Initializes the SQLite database in `data/catalog.db`.
-2. Imports products from DummyJSON.
-3. Serves the storefront at `/` and the API at `/docs`.
+Start with a small, working system and grow it into microservices as the domain becomes clearer. For the first version, a modular monolith or a few simple services is easier to build, test, and understand than many distributed services.
 
-## What You Need
+## MVP Capabilities
 
-- Python 3.11 or newer
-- `pip`
-- Internet access for the initial DummyJSON import, unless you run in cache-only mode
+- Browse products.
+- View product details.
+- Store product descriptions, prices, categories, and stock quantities.
+- Support checkout later by allowing stock to be read and eventually reduced.
+- Keep order, payment, cart, and user services as planned future modules.
 
-## Quick Start
+## Suggested Services
 
-From the project root:
+- API Gateway: Single entry point for frontend requests.
+- Auth/User Service: Signup, login, user profile, and token handling.
+- Catalog Service: Product title, description, images, category, brand, and price.
+- Inventory Service: Stock quantity, availability, reserve stock, and release stock.
+- Cart Service: Temporary shopping cart before checkout.
+- Order Service: Order creation, order status, and order history.
+- Payment Service: Payment initiation and confirmation.
+- Notification Service: Email or SMS confirmation.
+- Admin Service: Product and stock management for internal users.
+
+## First Version Scope
+
+The first build starts with the Catalog Service only. It includes product data and stock quantity so the application can show complete product information immediately. Later, stock ownership can move into a dedicated Inventory Service.
+
+## Architecture Workflow
+
+```mermaid
+flowchart LR
+  U[User / Frontend] --> G[API Gateway]
+
+  G --> A[Auth Service]
+  G --> C[Catalog Service]
+  G --> I[Inventory Service]
+  G --> R[Cart Service]
+  G --> O[Order Service]
+  G --> P[Payment Service]
+  G --> N[Notification Service]
+
+  C --> PC[(Catalog DB)]
+  I --> PI[(Inventory DB)]
+  R --> PR[(Cart DB / Redis)]
+  O --> PO[(Order DB)]
+  A --> PA[(User DB)]
+  P --> PP[(Payment DB / Provider)]
+
+  O --> MQ[(Message Queue)]
+  P --> MQ
+  I --> MQ
+  MQ --> N
+```
+
+## Service Ownership
+
+- Catalog Service answers: What is the product?
+- Inventory Service answers: How many units are available?
+- Cart Service answers: What does the user want to buy?
+- Order Service answers: What was purchased?
+- Payment Service answers: Did payment succeed?
+- Notification Service answers: Who needs to be informed?
+
+## Purchase Workflow
+
+1. User opens the product listing page.
+2. Frontend calls Catalog Service for product data.
+3. User opens one product and reads details.
+4. User adds product to cart.
+5. Cart Service stores selected items.
+6. User checks out.
+7. Order Service creates a pending order.
+8. Inventory Service checks stock.
+9. Inventory Service reserves or deducts stock.
+10. Payment Service processes payment.
+11. Order Service marks the order as confirmed.
+12. Notification Service sends confirmation.
+
+## Stock Handling
+
+For the final architecture, prefer reserve-then-confirm:
+
+- Reserve stock when checkout starts.
+- Confirm stock deduction after payment succeeds.
+- Release stock if payment fails or the checkout expires.
+
+For this first Catalog Service, stock quantity remains in the product table so the API is useful immediately.
+
+## Build Order
+
+1. Catalog Service.
+2. Inventory Service.
+3. Order Service.
+4. Auth/User Service.
+5. Cart Service.
+6. Payment flow.
+7. Notification Service.
+8. Admin product management.
+9. Search, recommendations, reviews, and analytics.
+
+## Current Catalog Service
+
+The current service uses FastAPI and SQLite.
+
+### Run Locally
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Create your local environment variables:
-
-```bash
-cp .env.example .env
-```
-
-Update `.env` if needed. The key values are:
-
-- `JWT_SECRET`: Required for auth tokens. Use a long, random value.
-- `USD_TO_INR_RATE`: Conversion rate used when importing DummyJSON prices. Default: `95.5`.
-- `DUMMYJSON_SYNC_INTERVAL_HOURS`: How often the catalog refreshes. Default: `24`.
-- `DUMMYJSON_USE_CACHE_ONLY`: Set to `1`, `true`, or `yes` to skip network access and use `data/dummyjson_products.json`.
-
-Start the app:
-
-```bash
 uvicorn app.main:app --reload
 ```
 
-Open these URLs in your browser:
+### API Endpoints
 
-- `http://127.0.0.1:8000` for the storefront
-- `http://127.0.0.1:8000/docs` for the interactive API docs
+- `GET /health`: Service health check.
+- `GET /products`: List all active products.
+- `GET /products?category=electronics`: Filter by category.
+- `GET /products?search=phone`: Search by name or description.
+- `GET /products/{product_id}`: Read one product.
+- `POST /products`: Create a product.
+- `PATCH /products/{product_id}/stock`: Update product stock quantity.
 
-## First Run Behavior
-
-When the server starts for the first time, it creates the local SQLite database and imports the DummyJSON catalog.
-
-If you want to force a full catalog import manually, run:
-
-```bash
-python -m app.catalog_import
-```
-
-## Running Tests
-
-The repository includes pytest-based tests. Run them with:
-
-```bash
-pytest
-```
-
-## Project Layout
+## Project Structure
 
 ```text
 app/
   main.py
   database.py
-  catalog_import.py
-  frontend/
-    index.html
-    styles.css
-    app.js
-  services/
-    auth/
-    cart/
-    catalog/
-    inventory/
-    orders/
+  models.py
+  schemas.py
+  seed.py
+  routes/
+    products.py
 data/
   catalog.db
-  dummyjson_products.json
 tests/
 requirements.txt
 ```
-
-## Service Overview
-
-- `catalog`: Product data and product listing APIs.
-- `inventory`: Stock quantity, reservation, and purchase handling.
-- `orders`: Order creation and order history.
-- `auth`: User registration, login, and JWT authentication.
-- `cart`: Per-user shopping carts and checkout flow.
-- `frontend`: The browser UI for browsing products, signing in, and checking out.
-- `catalog_import.py`: DummyJSON synchronization and USD-to-INR conversion.
-- `database.py`: Shared SQLite initialization and connections.
-- `main.py`: FastAPI application setup and route registration.
-
-## API Summary
-
-- `GET /health`: Health check
-- `GET /products`: List products
-- `GET /products/{product_id}`: View one product
-- `POST /products`: Create a product
-- `PATCH /products/{product_id}/stock`: Update product stock
-- `GET /inventory`: List inventory
-- `GET /inventory/{product_id}`: View inventory for one product
-- `PATCH /inventory/{product_id}`: Set stock quantity
-- `POST /inventory/{product_id}/reserve`: Reserve stock
-- `POST /inventory/{product_id}/purchase`: Deduct stock after purchase
-- `GET /orders`: List orders
-- `GET /orders/{order_id}`: View one order
-- `POST /orders`: Create an order
-- `POST /auth/register`: Register a user
-- `POST /auth/login`: Log in and receive a bearer token
-- `GET /auth/me`: Read the signed-in user profile
-- `GET /cart`: View the current user cart
-- `POST /cart/items`: Add an item to cart
-- `PATCH /cart/items/{product_id}`: Update cart item quantity
-- `DELETE /cart/items/{product_id}`: Remove one cart item
-- `DELETE /cart`: Clear the cart
-- `POST /cart/checkout`: Create an order from the cart
-
-Protected routes require:
-
-```text
-Authorization: Bearer <access_token>
-```
-
-## Notes
-
-- The SQLite schema is created automatically in `data/catalog.db` if it does not already exist.
-- Product prices are imported from DummyJSON in USD and stored in INR.
-- Local stock changes made by inventory and orders are preserved on later catalog refreshes.
+.
